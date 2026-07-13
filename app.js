@@ -246,9 +246,14 @@ function handlePosition(pos) {
   reminders.forEach((r) => {
     const d = haversineKm(here.lat, here.lng, r.lat, r.lng);
     if (r.armed && d <= r.radiusKm) {
-      fireReminder(r, d);
-      r.armed = false;
-      changed = true;
+      // Only disarm if the notification could actually be shown.
+      // Previously this disarmed unconditionally, so a silent permission
+      // failure permanently "consumed" the trigger until you left the
+      // zone by 1.5x the radius.
+      if (fireReminder(r, d)) {
+        r.armed = false;
+        changed = true;
+      }
     } else if (!r.armed && d > r.radiusKm * EXIT_BUFFER_MULTIPLIER) {
       // left the zone with margin — re-arm so it can trigger again next visit
       r.armed = true;
@@ -269,21 +274,48 @@ function fireReminder(reminder, distanceKm) {
   const title = "You're nearby";
   const body = `${reminder.message} (${distanceKm < 1 ? Math.round(distanceKm * 1000) + " m" : distanceKm.toFixed(2) + " km"} away)`;
 
+  // Without granted notification permission, registration.showNotification()
+  // rejects (silently, inside the SW's waitUntil) and `new Notification()`
+  // throws on Android. Bail out early, surface the problem, and report
+  // failure so the caller keeps the reminder armed.
+  if (!("Notification" in window) || Notification.permission !== "granted") {
+    console.warn("Reminder triggered but notification permission is", Notification.permission);
+    showPermissionBanner();
+    return false;
+  }
+
+  // Prefer the registration directly — it works whether or not this page
+  // is controlled yet (first load before clients.claim()).
+  if (swRegistration) {
+    swRegistration
+      .showNotification(title, {
+        body,
+        tag: reminder.id,
+        vibrate: [200, 100, 200, 100, 200],
+        icon: "icons/icon-192.png",
+        badge: "icons/icon-192.png",
+        requireInteraction: true,
+        data: { reminderId: reminder.id }
+      })
+      .catch((err) => console.error("showNotification failed", err));
+    return true;
+  }
+
   if (navigator.serviceWorker && navigator.serviceWorker.controller) {
     navigator.serviceWorker.controller.postMessage({
       type: "SHOW_REMINDER_NOTIFICATION",
       payload: { title, body, tag: reminder.id, reminderId: reminder.id }
     });
-  } else if (swRegistration) {
-    swRegistration.showNotification(title, {
-      body,
-      tag: reminder.id,
-      vibrate: [200, 100, 200, 100, 200],
-      icon: "icons/icon-192.png",
-      requireInteraction: true
-    });
-  } else if (Notification.permission === "granted") {
+    return true;
+  }
+
+  // Last resort for desktop browsers; on Android this constructor throws.
+  try {
     new Notification(title, { body });
+    return true;
+  } catch (err) {
+    console.error("Could not display notification", err);
+    return false;
   }
 }
 
@@ -296,13 +328,37 @@ function startWatching() {
   });
 }
 
-async function enableLocation() {
-  if (Notification.permission === "default") {
+function showPermissionBanner() {
+  const banner = document.getElementById("permissionBanner");
+  banner.classList.remove("hidden");
+  const geoMissing = !geoGranted;
+  const notifMissing = !("Notification" in window) || Notification.permission !== "granted";
+  const btn = document.getElementById("enableLocationBtn");
+  if (notifMissing && !geoMissing) {
+    btn.textContent = "Enable notifications";
+  } else if (geoMissing && notifMissing) {
+    btn.textContent = "Enable location & notifications";
+  } else {
+    btn.textContent = "Enable location";
+  }
+}
+
+let geoGranted = false;
+
+async function enablePermissions() {
+  // Must be called from a user gesture so the browser will show the prompts.
+  if ("Notification" in window && Notification.permission === "default") {
     await Notification.requestPermission();
+  }
+  if ("Notification" in window && Notification.permission === "denied") {
+    alert("Notifications are blocked for this app. Enable them in your browser/app settings or reminders can't alert you.");
   }
   navigator.geolocation.getCurrentPosition(
     () => {
-      document.getElementById("permissionBanner").classList.add("hidden");
+      geoGranted = true;
+      if (!("Notification" in window) || Notification.permission === "granted") {
+        document.getElementById("permissionBanner").classList.add("hidden");
+      }
       startWatching();
     },
     (err) => {
@@ -313,7 +369,7 @@ async function enableLocation() {
   );
 }
 
-document.getElementById("enableLocationBtn").addEventListener("click", enableLocation);
+document.getElementById("enableLocationBtn").addEventListener("click", enablePermissions);
 
 // ---------- service worker ----------
 
@@ -333,18 +389,25 @@ function init() {
   renderReminders();
   registerServiceWorker();
 
+  const notifGranted = "Notification" in window && Notification.permission === "granted";
+
   if (navigator.permissions && navigator.permissions.query) {
     navigator.permissions.query({ name: "geolocation" }).then((status) => {
-      if (status.state === "granted") {
+      geoGranted = status.state === "granted";
+      if (geoGranted) {
         startWatching();
-      } else {
-        document.getElementById("permissionBanner").classList.remove("hidden");
+      }
+      // KEY FIX: even when geolocation is already granted, we still need
+      // the banner if notification permission hasn't been granted yet —
+      // this was the path where reminders triggered but nothing appeared.
+      if (!geoGranted || !notifGranted) {
+        showPermissionBanner();
       }
     }).catch(() => {
-      document.getElementById("permissionBanner").classList.remove("hidden");
+      showPermissionBanner();
     });
   } else {
-    document.getElementById("permissionBanner").classList.remove("hidden");
+    showPermissionBanner();
   }
 }
 

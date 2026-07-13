@@ -3,7 +3,7 @@
 // a system notification (works even if the tab isn't focused, as
 // long as the browser process itself hasn't been fully killed by the OS).
 
-const CACHE_NAME = "nearby-reminders-v1";
+const CACHE_NAME = "nearby-reminders-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
