@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Nearby Reminders</title>
+<meta name="theme-color" content="#2563eb" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Reminders" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <h1>Nearby Reminders</h1>
+  <div id="statusPill" class="pill pill-off">location off</div>
+</header>
+
+<main>
+  <section id="permissionBanner" class="banner hidden">
+    <p>Location permission is needed to know when you're near a reminder. On iOS, add this app to your Home Screen first (Share &rarr; Add to Home Screen), then open it from there before granting permission.</p>
+    <button id="enableLocationBtn">Enable location</button>
+  </section>
+
+  <section id="reminderList" class="reminder-list">
+    <p class="empty-state" id="emptyState">No reminders yet. Add one below.</p>
+  </section>
+
+  <section class="add-card">
+    <h2>New reminder</h2>
+
+    <label for="messageInput">Remind me that&hellip;</label>
+    <input id="messageInput" type="text" placeholder="I left my guitar here" maxlength="140" />
+
+    <label for="addressInput">Location</label>
+    <div class="search-row">
+      <input id="addressInput" type="text" placeholder="Search an address or place" />
+      <button id="searchBtn" type="button">Search</button>
+    </div>
+    <ul id="searchResults" class="search-results hidden"></ul>
+
+    <div id="map"></div>
+    <p class="hint">Tap the map to fine-tune the pin. Drag it if needed.</p>
+
+    <label for="radiusInput">Trigger radius: <span id="radiusValue">1.0</span> km</label>
+    <input id="radiusInput" type="range" min="0.1" max="10" step="0.1" value="1" />
+
+    <button id="saveBtn" class="primary" disabled>Save reminder</button>
+  </section>
+
+  <section class="about">
+    <details>
+      <summary>How this works &amp; limitations</summary>
+      <p>This app checks your GPS position against your saved reminders while it's open (foreground or recently backgrounded). Neither iOS nor Android currently let installed web apps register true OS-level geofences, so if the app has been fully closed for a long time &mdash; especially on iOS &mdash; a nearby reminder may not fire until you reopen it. Keep it open in a background tab/app-switcher for the best results.</p>
+    </details>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
