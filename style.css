@@ -12,18 +12,23 @@
 
 * { box-sizing: border-box; }
 
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
-  padding-bottom: 2rem;
+  /* env(safe-area-inset-bottom) covers phones whose on-screen nav bar/gesture
+     strip sits under the content — matters on Samsung's software keys too. */
+  padding-bottom: max(2rem, calc(1rem + env(safe-area-inset-bottom)));
 }
 
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
   padding: 1rem 1.25rem;
   padding-top: max(1rem, env(safe-area-inset-top));
   position: sticky;
@@ -33,13 +38,19 @@ body {
   z-index: 10;
 }
 
-.topbar h1 { font-size: 1.15rem; margin: 0; }
+.topbar h1 {
+  font-size: 1.15rem;
+  margin: 0;
+  white-space: nowrap;
+}
 
 .pill {
   font-size: 0.75rem;
   padding: 0.3rem 0.6rem;
   border-radius: 999px;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .pill-off { background: rgba(239,68,68,0.15); color: var(--danger); }
 .pill-on { background: rgba(34,197,94,0.15); color: var(--good); }
@@ -65,6 +76,8 @@ button {
   color: var(--text);
   border: 1px solid var(--border);
   cursor: pointer;
+  /* keep every tap target close to the 44px minimum recommended for touch */
+  min-height: 44px;
 }
 button.primary { background: var(--accent); border-color: var(--accent); color: white; width: 100%; font-weight: 600; padding: 0.8rem; }
 button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -83,11 +96,20 @@ button:active { transform: scale(0.98); }
   gap: 0.75rem;
   align-items: flex-start;
 }
-.reminder-card .info { flex: 1; }
-.reminder-card .msg { font-weight: 600; margin: 0 0 0.2rem; }
+.reminder-card .info { flex: 1; min-width: 0; }
+.reminder-card .msg { font-weight: 600; margin: 0 0 0.2rem; overflow-wrap: anywhere; }
 .reminder-card .meta { font-size: 0.78rem; color: var(--muted); }
 .reminder-card .distance { font-size: 0.78rem; color: var(--accent-2); margin-top: 0.25rem; }
-.reminder-card .remove { background: transparent; border: none; color: var(--muted); font-size: 1.1rem; padding: 0.2rem 0.4rem; }
+.reminder-card .remove {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 1.1rem;
+  padding: 0.4rem 0.6rem;
+  min-height: 40px;
+  min-width: 40px;
+  flex-shrink: 0;
+}
 
 .add-card {
   background: var(--card);
@@ -107,10 +129,13 @@ input[type="text"] {
   background: #0c1428;
   color: var(--text);
   font: inherit;
+  font-size: 1rem; /* prevents iOS/Android auto-zoom-on-focus below 16px */
+  min-height: 44px;
 }
 
 .search-row { display: flex; gap: 0.5rem; }
-.search-row input { flex: 1; }
+.search-row input { flex: 1; min-width: 0; }
+.search-row button { flex-shrink: 0; white-space: nowrap; }
 
 .search-results {
   list-style: none;
@@ -123,7 +148,7 @@ input[type="text"] {
   overflow-y: auto;
 }
 .search-results li {
-  padding: 0.55rem 0.75rem;
+  padding: 0.6rem 0.75rem;
   font-size: 0.85rem;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
@@ -140,8 +165,44 @@ input[type="text"] {
 
 .hint { font-size: 0.75rem; color: var(--muted); margin: 0.4rem 0 0; }
 
-input[type="range"] { width: 100%; }
+input[type="range"] { width: 100%; height: 32px; }
 
 .about { margin: 1.5rem 0; }
-.about summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; }
+.about summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; padding: 0.5rem 0; }
 .about p { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+
+/* ---------------------------------------------------------------------
+   Narrow-phone tuning.
+   Galaxy S8 / S8+ report a 360 x 740 CSS-pixel viewport (devicePixelRatio 4)
+   — narrower than an iPhone SE (375) and most current Android flagships
+   (~412-430). 360px is the tightest common width, so this breakpoint
+   targets it directly and also covers older/smaller Android phones that
+   share the same 360px class (Galaxy S7/S6/Note4, LG G3-G5, etc).
+   -------------------------------------------------------------------- */
+@media (max-width: 380px) {
+  .topbar { padding: 0.85rem 1rem; }
+  .topbar h1 { font-size: 1.02rem; }
+  .pill { font-size: 0.68rem; padding: 0.28rem 0.5rem; }
+
+  main { padding: 0 0.85rem; }
+
+  .add-card { padding: 0.9rem; }
+  .add-card h2 { font-size: 0.95rem; }
+
+  .search-row { gap: 0.4rem; }
+  .search-row button { padding: 0.6rem 0.75rem; font-size: 0.9rem; }
+
+  .reminder-card { padding: 0.75rem 0.85rem; }
+
+  #map { height: 190px; }
+}
+
+/* Compact-height tuning: matters when the app is used in a regular browser
+   tab (URL bar + nav chrome eats vertical space) rather than installed as a
+   standalone PWA. On a Galaxy S8 (740 CSS px tall) this can leave well under
+   700px of usable height. */
+@media (max-height: 700px) {
+  #map { height: 170px; }
+  .add-card { margin: 1rem 0; }
+  .add-card label { margin: 0.65rem 0 0.3rem; }
+}
